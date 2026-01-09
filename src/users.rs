@@ -120,8 +120,8 @@ impl UserRepo for SqliteUserRepo {
             Ok(_) => {
                 Ok(User {
                     id,
-                    username: username.clone(),
-                    email: email.clone(),
+                    username,
+                    email,
                 })
             }
             Err(err) => Err(format!("Failed to add user: {}", err)),
@@ -136,9 +136,20 @@ impl UserRepo for SqliteUserRepo {
         
         if user.is_some() {
             let query = "DELETE FROM users WHERE id = ?";
-            if let Ok(mut statement) = self.connection.prepare(query) {
-                if statement.bind((1, id.as_str())).is_ok() {
-                    let _ = statement.next();
+            match self.connection.prepare(query) {
+                Ok(mut statement) => {
+                    if let Err(e) = statement.bind((1, id.as_str())) {
+                        error!("Failed to bind id in remove_user: {}", e);
+                        return None;
+                    }
+                    if let Err(e) = statement.next() {
+                        error!("Failed to execute DELETE in remove_user: {}", e);
+                        return None;
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to prepare DELETE statement in remove_user: {}", e);
+                    return None;
                 }
             }
         }
