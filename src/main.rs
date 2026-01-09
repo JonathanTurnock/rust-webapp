@@ -2,7 +2,7 @@ mod app;
 mod users;
 
 use crate::app::Application;
-use crate::users::{User, UserRepo, TestUserRepo};
+use crate::users::{User, UserRepo, SqliteUserRepo};
 use actix_web::web::{Data, Json, Path};
 use actix_web::{delete, get, post, App, HttpResponse, HttpServer, Responder};
 use std::sync::Mutex;
@@ -11,7 +11,7 @@ use utoipa::OpenApi;
 use log::{info};
 use actix_cors::Cors;
 
-type _Application = Application<TestUserRepo>;
+type _Application = Application<SqliteUserRepo>;
 struct AppState {
     application: Mutex<_Application>,
 }
@@ -66,6 +66,16 @@ impl From<&User> for UserDto {
     }
 }
 
+impl From<User> for UserDto {
+    fn from(user: User) -> Self {
+        Self {
+            id: user.id.to_string(),
+            username: user.username,
+            email: user.email,
+        }
+    }
+}
+
 
 #[utoipa::path(
     responses(
@@ -77,7 +87,7 @@ async fn get_users(data: Data<AppState>) -> impl Responder {
     info!("Fetching all users");
     let application = data.application.lock().unwrap();
 
-    let users: Vec<&User> = application.users.list_users();
+    let users: Vec<User> = application.users.list_users();
     HttpResponse::Ok().json(users.into_iter().map(UserDto::from).collect::<Vec<_>>())
 }
 
@@ -129,7 +139,7 @@ async fn delete_user(data: Data<AppState>, id: Path<String>) -> impl Responder {
     info!("Deleting user: {}", id);
     let mut application = data.application.lock().unwrap();
     match application.users.remove_user(&id) {
-        Some(user) => HttpResponse::Ok().json(UserDto::from(&user)),
+        Some(user) => HttpResponse::Ok().json(UserDto::from(user)),
         None => HttpResponse::NotFound().body("User not found"),
     }
 }
@@ -143,7 +153,7 @@ async fn api_docs() -> impl Responder {
 async fn main() -> std::io::Result<()> {
     log4rs::init_file("log4rs.yaml", Default::default()).unwrap();
 
-    let users_impl = TestUserRepo::new();
+    let users_impl = SqliteUserRepo::new("data.sqlite");
     let application = Application::new(users_impl);
     let data = Data::new(AppState {
         application: Mutex::new(application),
