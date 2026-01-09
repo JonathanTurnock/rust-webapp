@@ -21,8 +21,12 @@ struct SqlxUserRow {
 
 impl From<SqlxUserRow> for User {
     fn from(row: SqlxUserRow) -> Self {
+        let id = Uuid::parse_str(&row.id).unwrap_or_else(|e| {
+            error!("Failed to parse UUID '{}': {}. Generating new UUID.", row.id, e);
+            Uuid::new_v4()
+        });
         User {
-            id: Uuid::parse_str(&row.id).unwrap_or_else(|_| Uuid::new_v4()),
+            id,
             username: row.username,
             email: row.email,
         }
@@ -169,8 +173,12 @@ impl UserRepo for SqliteUserRepo {
         .await
         {
             Ok(row) => Some(row.into()),
+            Err(sqlx::Error::RowNotFound) => {
+                info!("User not found: {}", id);
+                None
+            }
             Err(e) => {
-                info!("User not found: {}", e);
+                error!("Database error while fetching user {}: {}", id, e);
                 None
             }
         }
