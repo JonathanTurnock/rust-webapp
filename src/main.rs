@@ -87,7 +87,7 @@ async fn get_users(data: Data<AppState>) -> impl Responder {
     info!("Fetching all users");
     let application = data.application.lock().unwrap();
 
-    let users: Vec<User> = application.users.list_users();
+    let users: Vec<User> = application.users.list_users().await;
     HttpResponse::Ok().json(users.into_iter().map(UserDto::from).collect::<Vec<_>>())
 }
 
@@ -104,7 +104,7 @@ async fn create_user(data: Data<AppState>, user_dto: Json<CreateUserDto>) -> imp
     let mut application = data.application.lock().unwrap();
 
     let add_result =
-        (application.users).add_user(user_dto.username.clone(), user_dto.email.clone());
+        (application.users).add_user(user_dto.username.clone(), user_dto.email.clone()).await;
 
     match add_result {
         Ok(user) => HttpResponse::Ok().json(UserDto::from(user)),
@@ -122,7 +122,7 @@ async fn create_user(data: Data<AppState>, user_dto: Json<CreateUserDto>) -> imp
 async fn get_user(data: Data<AppState>, id: Path<String>) -> impl Responder {
     info!("Fetching user: {}", id);
     let application = data.application.lock().unwrap();
-    match application.users.get_user(id.clone()) {
+    match application.users.get_user(id.clone()).await {
         Some(user) => HttpResponse::Ok().json(UserDto::from(user)),
         None => HttpResponse::NotFound().body("User not found"),
     }
@@ -138,7 +138,7 @@ async fn get_user(data: Data<AppState>, id: Path<String>) -> impl Responder {
 async fn delete_user(data: Data<AppState>, id: Path<String>) -> impl Responder {
     info!("Deleting user: {}", id);
     let mut application = data.application.lock().unwrap();
-    match application.users.remove_user(&id) {
+    match application.users.remove_user(&id).await {
         Some(user) => HttpResponse::Ok().json(UserDto::from(user)),
         None => HttpResponse::NotFound().body("User not found"),
     }
@@ -153,7 +153,7 @@ async fn api_docs() -> impl Responder {
 async fn main() -> std::io::Result<()> {
     log4rs::init_file("log4rs.yaml", Default::default()).unwrap();
 
-    let users_impl = SqliteUserRepo::new("data.sqlite");
+    let users_impl = SqliteUserRepo::new("sqlite:data.sqlite").await;
     let application = Application::new(users_impl);
     let data = Data::new(AppState {
         application: Mutex::new(application),
