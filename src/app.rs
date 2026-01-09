@@ -1,10 +1,10 @@
-use crate::users::Users;
+use crate::users::UserRepo;
 
-pub struct Application<U: Users> {
+pub struct Application<U: UserRepo> {
     pub users: U,
 }
 
-impl<U: Users> Application<U> {
+impl<U: UserRepo> Application<U> {
     pub fn new(users: U) -> Self {
         Application { users }
     }
@@ -13,11 +13,11 @@ impl<U: Users> Application<U> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::users::UsersImpl;
+    use crate::users::TestUserRepo;
 
     #[test]
     fn test_add_user() {
-        let users = UsersImpl::new();
+        let users = TestUserRepo::new();
         let mut app = Application::new(users);
         assert_eq!(app.users.list_users().len(), 0);
         app.users
@@ -28,7 +28,7 @@ mod tests {
 
     #[test]
     fn test_get_user() {
-        let users = UsersImpl::new();
+        let users = TestUserRepo::new();
         let mut app = Application::new(users);
         let user = app
             .users
@@ -40,7 +40,7 @@ mod tests {
 
     #[test]
     fn test_list_users() {
-        let users = UsersImpl::new();
+        let users = TestUserRepo::new();
         let mut app = Application::new(users);
         assert_eq!(app.users.list_users().len(), 0);
         app.users
@@ -52,7 +52,7 @@ mod tests {
 
     #[test]
     fn test_remove_user() {
-        let users = UsersImpl::new();
+        let users = TestUserRepo::new();
         let mut app = Application::new(users);
         let user = app
             .users

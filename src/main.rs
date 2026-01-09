@@ -2,7 +2,7 @@ mod app;
 mod users;
 
 use crate::app::Application;
-use crate::users::{User, Users, UsersImpl};
+use crate::users::{User, UserRepo, TestUserRepo};
 use actix_web::web::{Data, Json, Path};
 use actix_web::{delete, get, post, App, HttpResponse, HttpServer, Responder};
 use std::sync::Mutex;
@@ -11,7 +11,7 @@ use utoipa::OpenApi;
 use log::{info};
 use actix_cors::Cors;
 
-type _Application = Application<UsersImpl>;
+type _Application = Application<TestUserRepo>;
 struct AppState {
     application: Mutex<_Application>,
 }
@@ -143,7 +143,7 @@ async fn api_docs() -> impl Responder {
 async fn main() -> std::io::Result<()> {
     log4rs::init_file("log4rs.yaml", Default::default()).unwrap();
 
-    let users_impl = UsersImpl::new();
+    let users_impl = TestUserRepo::new();
     let application = Application::new(users_impl);
     let data = Data::new(AppState {
         application: Mutex::new(application),

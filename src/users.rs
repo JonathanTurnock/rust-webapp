@@ -10,7 +10,7 @@ pub struct User {
     pub email: String,
 }
 
-pub trait Users {
+pub trait UserRepo {
     fn new() -> Self;
     fn add_user(&mut self, username: String, email: String) -> Result<&User, String>;
     fn remove_user(&mut self, username: &String) -> Option<User>;
@@ -18,13 +18,13 @@ pub trait Users {
     fn list_users(&self) -> Vec<&User>;
 }
 
-pub struct UsersImpl {
+pub struct TestUserRepo {
     users: HashMap<String, User>,
 }
 
-impl Users for UsersImpl {
+impl UserRepo for TestUserRepo {
     fn new() -> Self {
-        UsersImpl {
+        TestUserRepo {
             users: HashMap::new(),
         }
     }
