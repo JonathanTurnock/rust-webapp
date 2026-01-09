@@ -2,7 +2,7 @@ use std::collections::hash_map::Entry::Vacant;
 use std::collections::HashMap;
 use log::info;
 use uuid::Uuid;
-use sqlite::{Connection, State};
+use sqlite::Connection;
 
 #[derive(Clone)]
 pub struct User {
@@ -63,28 +63,6 @@ impl UserRepo for TestUserRepo {
 pub struct SqliteUserRepo {
     connection: Connection,
     cache: HashMap<String, User>,
-}
-
-impl SqliteUserRepo {
-    fn sync_from_db(&mut self) {
-        self.cache.clear();
-        let query = "SELECT id, username, email FROM users";
-        let mut statement = self.connection.prepare(query).unwrap();
-        
-        while let Ok(State::Row) = statement.next() {
-            let id_str = statement.read::<String, _>("id").unwrap();
-            let username = statement.read::<String, _>("username").unwrap();
-            let email = statement.read::<String, _>("email").unwrap();
-            let id = Uuid::parse_str(&id_str).unwrap();
-            
-            let user = User {
-                id,
-                username,
-                email,
-            };
-            self.cache.insert(id_str, user);
-        }
-    }
 }
 
 impl UserRepo for SqliteUserRepo {
