@@ -15,103 +15,119 @@ mod tests {
     use super::*;
     use crate::users::{TestUserRepo, SqliteUserRepo};
 
-    #[test]
-    fn test_add_user() {
-        let users = TestUserRepo::new(":memory:");
+    #[tokio::test]
+    async fn test_add_user() {
+        let users = TestUserRepo::new(":memory:").await;
         let mut app = Application::new(users);
-        assert_eq!(app.users.list_users().len(), 0);
+        assert_eq!(app.users.list_users().await.len(), 0);
         app.users
             .add_user("johndoe".to_string(), "johndoe@example.com".to_string())
+            .await
             .unwrap();
-        assert_eq!(app.users.list_users().len(), 1);
+        assert_eq!(app.users.list_users().await.len(), 1);
     }
 
-    #[test]
-    fn test_get_user() {
-        let users = TestUserRepo::new(":memory:");
+    #[tokio::test]
+    async fn test_get_user() {
+        let users = TestUserRepo::new(":memory:").await;
         let mut app = Application::new(users);
         let user = app
             .users
-            .add_user("johndoe".to_string(), "johndoe@example.com".to_string()).unwrap();
-        let fetched = app.users.get_user(user.id.to_string()).unwrap();
+            .add_user("johndoe".to_string(), "johndoe@example.com".to_string())
+            .await
+            .unwrap();
+        let fetched = app.users.get_user(user.id.to_string()).await.unwrap();
         assert_eq!(fetched.username, "johndoe");
         assert_eq!(fetched.email, "johndoe@example.com");
     }
 
-    #[test]
-    fn test_list_users() {
-        let users = TestUserRepo::new(":memory:");
+    #[tokio::test]
+    async fn test_list_users() {
+        let users = TestUserRepo::new(":memory:").await;
         let mut app = Application::new(users);
-        assert_eq!(app.users.list_users().len(), 0);
+        assert_eq!(app.users.list_users().await.len(), 0);
         app.users
-            .add_user("johndoe".to_string(), "johndoe@example.com".to_string()).unwrap();
+            .add_user("johndoe".to_string(), "johndoe@example.com".to_string())
+            .await
+            .unwrap();
         app.users
-            .add_user("janedoe".to_string(), "janedoe@example.com".to_string()).unwrap();
-        assert_eq!(app.users.list_users().len(), 2);
+            .add_user("janedoe".to_string(), "janedoe@example.com".to_string())
+            .await
+            .unwrap();
+        assert_eq!(app.users.list_users().await.len(), 2);
     }
 
-    #[test]
-    fn test_remove_user() {
-        let users = TestUserRepo::new(":memory:");
+    #[tokio::test]
+    async fn test_remove_user() {
+        let users = TestUserRepo::new(":memory:").await;
         let mut app = Application::new(users);
         let user = app
             .users
             .add_user("johndoe".to_string(), "johndoe@example.com".to_string())
+            .await
             .unwrap();
-        assert_eq!(app.users.list_users().len(), 1);
-        let returned = app.users.remove_user(&user.id.to_string()).unwrap();
+        assert_eq!(app.users.list_users().await.len(), 1);
+        let returned = app.users.remove_user(&user.id.to_string()).await.unwrap();
         assert_eq!(returned.username, "johndoe");
         assert_eq!(returned.email, "johndoe@example.com");
-        assert_eq!(app.users.list_users().len(), 0);
+        assert_eq!(app.users.list_users().await.len(), 0);
     }
 
-    #[test]
-    fn test_sqlite_add_user() {
-        let users = SqliteUserRepo::new(":memory:");
+    #[tokio::test]
+    async fn test_sqlite_add_user() {
+        let users = SqliteUserRepo::new("sqlite::memory:").await;
         let mut app = Application::new(users);
-        assert_eq!(app.users.list_users().len(), 0);
+        assert_eq!(app.users.list_users().await.len(), 0);
         app.users
             .add_user("johndoe".to_string(), "johndoe@example.com".to_string())
+            .await
             .unwrap();
-        assert_eq!(app.users.list_users().len(), 1);
+        assert_eq!(app.users.list_users().await.len(), 1);
     }
 
-    #[test]
-    fn test_sqlite_get_user() {
-        let users = SqliteUserRepo::new(":memory:");
+    #[tokio::test]
+    async fn test_sqlite_get_user() {
+        let users = SqliteUserRepo::new("sqlite::memory:").await;
         let mut app = Application::new(users);
         let user = app
             .users
-            .add_user("johndoe".to_string(), "johndoe@example.com".to_string()).unwrap();
-        let fetched = app.users.get_user(user.id.to_string()).unwrap();
+            .add_user("johndoe".to_string(), "johndoe@example.com".to_string())
+            .await
+            .unwrap();
+        let fetched = app.users.get_user(user.id.to_string()).await.unwrap();
         assert_eq!(fetched.username, "johndoe");
         assert_eq!(fetched.email, "johndoe@example.com");
     }
 
-    #[test]
-    fn test_sqlite_list_users() {
-        let users = SqliteUserRepo::new(":memory:");
+    #[tokio::test]
+    async fn test_sqlite_list_users() {
+        let users = SqliteUserRepo::new("sqlite::memory:").await;
         let mut app = Application::new(users);
-        assert_eq!(app.users.list_users().len(), 0);
+        assert_eq!(app.users.list_users().await.len(), 0);
         app.users
-            .add_user("johndoe".to_string(), "johndoe@example.com".to_string()).unwrap();
+            .add_user("johndoe".to_string(), "johndoe@example.com".to_string())
+            .await
+            .unwrap();
         app.users
-            .add_user("janedoe".to_string(), "janedoe@example.com".to_string()).unwrap();
-        assert_eq!(app.users.list_users().len(), 2);
+            .add_user("janedoe".to_string(), "janedoe@example.com".to_string())
+            .await
+            .unwrap();
+        assert_eq!(app.users.list_users().await.len(), 2);
     }
 
-    #[test]
-    fn test_sqlite_remove_user() {
-        let users = SqliteUserRepo::new(":memory:");
+    #[tokio::test]
+    async fn test_sqlite_remove_user() {
+        let users = SqliteUserRepo::new("sqlite::memory:").await;
         let mut app = Application::new(users);
         let user = app
             .users
             .add_user("johndoe".to_string(), "johndoe@example.com".to_string())
+            .await
             .unwrap();
-        assert_eq!(app.users.list_users().len(), 1);
-        let returned = app.users.remove_user(&user.id.to_string()).unwrap();
+        assert_eq!(app.users.list_users().await.len(), 1);
+        let returned = app.users.remove_user(&user.id.to_string()).await.unwrap();
         assert_eq!(returned.username, "johndoe");
         assert_eq!(returned.email, "johndoe@example.com");
-        assert_eq!(app.users.list_users().len(), 0);
+        assert_eq!(app.users.list_users().await.len(), 0);
     }
 }
