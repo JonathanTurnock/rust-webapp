@@ -17,7 +17,7 @@ mod tests {
 
     #[test]
     fn test_add_user() {
-        let users = TestUserRepo::new();
+        let users = TestUserRepo::new(":memory:");
         let mut app = Application::new(users);
         assert_eq!(app.users.list_users().len(), 0);
         app.users
@@ -28,7 +28,7 @@ mod tests {
 
     #[test]
     fn test_get_user() {
-        let users = TestUserRepo::new();
+        let users = TestUserRepo::new(":memory:");
         let mut app = Application::new(users);
         let user = app
             .users
@@ -40,7 +40,7 @@ mod tests {
 
     #[test]
     fn test_list_users() {
-        let users = TestUserRepo::new();
+        let users = TestUserRepo::new(":memory:");
         let mut app = Application::new(users);
         assert_eq!(app.users.list_users().len(), 0);
         app.users
@@ -52,7 +52,7 @@ mod tests {
 
     #[test]
     fn test_remove_user() {
-        let users = TestUserRepo::new();
+        let users = TestUserRepo::new(":memory:");
         let mut app = Application::new(users);
         let user = app
             .users
@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn test_sqlite_add_user() {
-        let users = SqliteUserRepo::new();
+        let users = SqliteUserRepo::new(":memory:");
         let mut app = Application::new(users);
         assert_eq!(app.users.list_users().len(), 0);
         app.users
@@ -78,7 +78,7 @@ mod tests {
 
     #[test]
     fn test_sqlite_get_user() {
-        let users = SqliteUserRepo::new();
+        let users = SqliteUserRepo::new(":memory:");
         let mut app = Application::new(users);
         let user = app
             .users
@@ -90,7 +90,7 @@ mod tests {
 
     #[test]
     fn test_sqlite_list_users() {
-        let users = SqliteUserRepo::new();
+        let users = SqliteUserRepo::new(":memory:");
         let mut app = Application::new(users);
         assert_eq!(app.users.list_users().len(), 0);
         app.users
@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn test_sqlite_remove_user() {
-        let users = SqliteUserRepo::new();
+        let users = SqliteUserRepo::new(":memory:");
         let mut app = Application::new(users);
         let user = app
             .users

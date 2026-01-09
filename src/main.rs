@@ -153,7 +153,7 @@ async fn api_docs() -> impl Responder {
 async fn main() -> std::io::Result<()> {
     log4rs::init_file("log4rs.yaml", Default::default()).unwrap();
 
-    let users_impl = SqliteUserRepo::new();
+    let users_impl = SqliteUserRepo::new("data.sqlite");
     let application = Application::new(users_impl);
     let data = Data::new(AppState {
         application: Mutex::new(application),

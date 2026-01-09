@@ -12,7 +12,7 @@ pub struct User {
 }
 
 pub trait UserRepo {
-    fn new() -> Self;
+    fn new(db_url: &str) -> Self;
     fn add_user(&mut self, username: String, email: String) -> Result<User, String>;
     fn remove_user(&mut self, username: &String) -> Option<User>;
     fn get_user(&self, username: String) -> Option<User>;
@@ -24,7 +24,7 @@ pub struct TestUserRepo {
 }
 
 impl UserRepo for TestUserRepo {
-    fn new() -> Self {
+    fn new(_db_url: &str) -> Self {
         TestUserRepo {
             users: HashMap::new(),
         }
@@ -68,18 +68,18 @@ pub struct SqliteUserRepo {
 }
 
 impl UserRepo for SqliteUserRepo {
-    fn new() -> Self {
-        let connection = match sqlite::open(":memory:") {
+    fn new(db_url: &str) -> Self {
+        let connection = match sqlite::open(db_url) {
             Ok(conn) => conn,
             Err(e) => {
-                error!("Failed to open SQLite connection: {}", e);
+                error!("Failed to open SQLite connection at '{}': {}", db_url, e);
                 panic!("Cannot create database connection");
             }
         };
         
         if let Err(e) = connection.execute(
             "
-            CREATE TABLE users (
+            CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
                 username TEXT NOT NULL,
                 email TEXT NOT NULL
