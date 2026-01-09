@@ -12,3 +12,4 @@ utoipa = {version = "5.4.0", features = ["actix_extras"]}
 log4rs = "1.4.0"
 log = "0.4.29"
 actix-cors = "0.7.1"
+sqlite = "0.36.1"
