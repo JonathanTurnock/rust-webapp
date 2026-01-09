@@ -14,7 +14,20 @@ impl<U: UserRepo> Application<U> {
 mod tests {
     use super::*;
     use crate::users::{TestUserRepo, SqliteUserRepo, MongoUserRepo};
-    use testcontainers::{runners::AsyncRunner, GenericImage};
+    use testcontainers::{runners::AsyncRunner, GenericImage, ContainerAsync};
+
+    async fn setup_mongo() -> (ContainerAsync<GenericImage>, String) {
+        let mongo_container = GenericImage::new("mongo", "7.0")
+            .with_exposed_port(27017.into())
+            .start()
+            .await
+            .expect("Failed to start MongoDB container");
+        
+        let mongo_port = mongo_container.get_host_port_ipv4(27017).await.expect("Failed to get MongoDB port");
+        let mongo_url = format!("mongodb://localhost:{}", mongo_port);
+        
+        (mongo_container, mongo_url)
+    }
 
     #[tokio::test]
     async fn test_add_user() {
@@ -134,14 +147,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mongo_add_user() {
-        let mongo_container = GenericImage::new("mongo", "7.0")
-            .with_exposed_port(27017.into())
-            .start()
-            .await
-            .expect("Failed to start MongoDB container");
-        
-        let mongo_port = mongo_container.get_host_port_ipv4(27017).await.expect("Failed to get MongoDB port");
-        let mongo_url = format!("mongodb://localhost:{}", mongo_port);
+        let (_mongo_container, mongo_url) = setup_mongo().await;
         
         let users = MongoUserRepo::new(&mongo_url).await;
         let mut app = Application::new(users);
@@ -155,14 +161,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mongo_get_user() {
-        let mongo_container = GenericImage::new("mongo", "7.0")
-            .with_exposed_port(27017.into())
-            .start()
-            .await
-            .expect("Failed to start MongoDB container");
-        
-        let mongo_port = mongo_container.get_host_port_ipv4(27017).await.expect("Failed to get MongoDB port");
-        let mongo_url = format!("mongodb://localhost:{}", mongo_port);
+        let (_mongo_container, mongo_url) = setup_mongo().await;
         
         let users = MongoUserRepo::new(&mongo_url).await;
         let mut app = Application::new(users);
@@ -178,14 +177,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mongo_list_users() {
-        let mongo_container = GenericImage::new("mongo", "7.0")
-            .with_exposed_port(27017.into())
-            .start()
-            .await
-            .expect("Failed to start MongoDB container");
-        
-        let mongo_port = mongo_container.get_host_port_ipv4(27017).await.expect("Failed to get MongoDB port");
-        let mongo_url = format!("mongodb://localhost:{}", mongo_port);
+        let (_mongo_container, mongo_url) = setup_mongo().await;
         
         let users = MongoUserRepo::new(&mongo_url).await;
         let mut app = Application::new(users);
@@ -203,14 +195,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mongo_remove_user() {
-        let mongo_container = GenericImage::new("mongo", "7.0")
-            .with_exposed_port(27017.into())
-            .start()
-            .await
-            .expect("Failed to start MongoDB container");
-        
-        let mongo_port = mongo_container.get_host_port_ipv4(27017).await.expect("Failed to get MongoDB port");
-        let mongo_url = format!("mongodb://localhost:{}", mongo_port);
+        let (_mongo_container, mongo_url) = setup_mongo().await;
         
         let users = MongoUserRepo::new(&mongo_url).await;
         let mut app = Application::new(users);

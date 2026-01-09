@@ -3,6 +3,7 @@ use log::{info, error};
 use uuid::Uuid;
 use mongodb::{Client, Collection, bson::doc};
 use serde::{Serialize, Deserialize};
+use futures_util::stream::TryStreamExt;
 
 // MongoDB document struct
 #[derive(Debug, Serialize, Deserialize)]
@@ -108,7 +109,6 @@ impl UserRepo for MongoUserRepo {
         
         match self.collection.find(doc! {}).await {
             Ok(mut cursor) => {
-                use futures_util::stream::TryStreamExt;
                 let mut users = Vec::new();
                 while let Ok(Some(doc)) = cursor.try_next().await {
                     users.push(doc.into());
