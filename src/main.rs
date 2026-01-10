@@ -1,19 +1,25 @@
-mod app;
-mod users;
+pub mod adapters;
+pub mod app;
+pub mod users;
 
+use crate::adapters::sqlite::SqliteUserRepo;
 use crate::app::Application;
-use crate::users::{User, UserRepo, SqliteUserRepo};
+use crate::users::{User, UserRepo, UserRepoError};
+use actix_cors::Cors;
+use actix_web::http::StatusCode;
 use actix_web::web::{Data, Json, Path};
-use actix_web::{delete, get, post, App, HttpResponse, HttpServer, Responder};
-use std::sync::Mutex;
+use actix_web::{delete, get, post, App, HttpServer, Responder, ResponseError, Result};
+use log::{error, info};
+use std::io;
+use sqlx::migrate::MigrateDatabase;
+use sqlx::Sqlite;
+use thiserror::Error;
 use utoipa;
 use utoipa::OpenApi;
-use log::{info};
-use actix_cors::Cors;
+use uuid::Uuid;
 
-type _Application = Application<SqliteUserRepo>;
 struct AppState {
-    application: Mutex<_Application>,
+    application: Application<SqliteUserRepo>,
 }
 
 #[derive(OpenApi)]
@@ -35,7 +41,6 @@ struct ApiDoc;
 
 #[derive(serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 struct UserDto {
-
     /// Unique identifier for the user
     /// example = "550e8400-e29b-41d4-a716-446655440000"
     /// format = "uuid"
@@ -56,16 +61,6 @@ struct CreateUserDto {
     email: String,
 }
 
-impl From<&User> for UserDto {
-    fn from(user: &User) -> Self {
-        Self {
-            id: user.id.to_string(),
-            username: user.username.clone(),
-            email: user.email.clone(),
-        }
-    }
-}
-
 impl From<User> for UserDto {
     fn from(user: User) -> Self {
         Self {
@@ -76,6 +71,41 @@ impl From<User> for UserDto {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum ApiError {
+    #[error("conflict")]
+    Conflict,
+
+    #[error("bad request: {0}")]
+    BadRequest(String),
+
+    #[error("internal server error")]
+    Internal,
+
+    #[error("not found")]
+    NotFound,
+}
+
+impl From<UserRepoError> for ApiError {
+    fn from(e: UserRepoError) -> Self {
+        match e {
+            UserRepoError::Conflict { .. } => ApiError::Conflict,
+            UserRepoError::Unavailable => ApiError::Internal, // or ServiceUnavailable if you add it
+            UserRepoError::Unexpected(_) => ApiError::Internal,
+        }
+    }
+}
+
+impl ResponseError for ApiError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            ApiError::Conflict => StatusCode::CONFLICT,
+            ApiError::BadRequest(_) => StatusCode::BAD_REQUEST,
+            ApiError::Internal => StatusCode::INTERNAL_SERVER_ERROR,
+            ApiError::NotFound => StatusCode::NOT_FOUND,
+        }
+    }
+}
 
 #[utoipa::path(
     responses(
@@ -83,12 +113,11 @@ impl From<User> for UserDto {
     )
 )]
 #[get("/api/users")]
-async fn get_users(data: Data<AppState>) -> impl Responder {
+async fn get_users(data: Data<AppState>) -> Result<Json<Vec<UserDto>>, ApiError> {
     info!("Fetching all users");
-    let application = data.application.lock().unwrap();
-
-    let users: Vec<User> = application.users.list_users().await;
-    HttpResponse::Ok().json(users.into_iter().map(UserDto::from).collect::<Vec<_>>())
+    let users = data.application.users.list_users().await?;
+    let users_dto: Vec<UserDto> = users.into_iter().map(UserDto::from).collect();
+    Ok(Json(users_dto))
 }
 
 #[utoipa::path(
@@ -99,17 +128,16 @@ async fn get_users(data: Data<AppState>) -> impl Responder {
     )
 )]
 #[post("/api/users")]
-async fn create_user(data: Data<AppState>, user_dto: Json<CreateUserDto>) -> impl Responder {
+async fn create_user(data: Data<AppState>, user_dto: Json<CreateUserDto>) -> Result<Json<UserDto>, ApiError> {
     info!("Creating user: {}", user_dto.username);
-    let mut application = data.application.lock().unwrap();
 
-    let add_result =
-        (application.users).add_user(user_dto.username.clone(), user_dto.email.clone()).await;
+    let user = data
+        .application
+        .users
+        .add_user(&user_dto.username, &user_dto.email)
+        .await?;
 
-    match add_result {
-        Ok(user) => HttpResponse::Ok().json(UserDto::from(user)),
-        Err(err_msg) => HttpResponse::Conflict().body(err_msg),
-    }
+    Ok(Json(UserDto::from(user)))
 }
 
 #[utoipa::path(
@@ -119,13 +147,10 @@ async fn create_user(data: Data<AppState>, user_dto: Json<CreateUserDto>) -> imp
     )
 )]
 #[get("/api/users/{id}")]
-async fn get_user(data: Data<AppState>, id: Path<String>) -> impl Responder {
+async fn get_user(data: Data<AppState>, id: Path<Uuid>) -> Result<Json<UserDto>, ApiError> {
     info!("Fetching user: {}", id);
-    let application = data.application.lock().unwrap();
-    match application.users.get_user(id.clone()).await {
-        Some(user) => HttpResponse::Ok().json(UserDto::from(user)),
-        None => HttpResponse::NotFound().body("User not found"),
-    }
+    let user = data.application.users.get_user(*id).await?.ok_or(ApiError::NotFound)?;
+    Ok(Json(UserDto::from(user)))
 }
 
 #[utoipa::path(
@@ -135,37 +160,51 @@ async fn get_user(data: Data<AppState>, id: Path<String>) -> impl Responder {
     )
 )]
 #[delete("/api/users/{id}")]
-async fn delete_user(data: Data<AppState>, id: Path<String>) -> impl Responder {
+async fn delete_user(data: Data<AppState>, id: Path<Uuid>) -> Result<Json<UserDto>, ApiError> {
     info!("Deleting user: {}", id);
-    let mut application = data.application.lock().unwrap();
-    match application.users.remove_user(&id).await {
-        Some(user) => HttpResponse::Ok().json(UserDto::from(user)),
-        None => HttpResponse::NotFound().body("User not found"),
-    }
+
+    let removed = data.application.users.remove_user(*id).await?;
+
+    let user = removed.ok_or(ApiError::NotFound)?;
+    Ok(Json(UserDto::from(user)))
 }
 
 #[get("/v3/api-docs")]
 async fn api_docs() -> impl Responder {
-    HttpResponse::Ok().json(ApiDoc::openapi())
+    Json(ApiDoc::openapi())
 }
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> io::Result<()> {
     log4rs::init_file("log4rs.yaml", Default::default()).unwrap();
 
-    let users_impl = SqliteUserRepo::new("sqlite:data.sqlite").await;
+    Sqlite::create_database("data.sqlite").await.map_err(|e| {
+        error!("Failed to create SQLite database: {}", e);
+        io::Error::new(io::ErrorKind::Other, e)
+    })?;
+
+    let pool = sqlx::SqlitePool::connect("sqlite:data.sqlite")
+        .await
+        .map_err(|e| {
+            error!("Failed to connect to SQLite database: {}", e);
+            io::Error::new(io::ErrorKind::Other, e)
+        })?;
+
+    let users_impl = SqliteUserRepo::new(pool).await.map_err(|e| {
+        error!("Failed to initialize SQLiteUserRepo: {}", e);
+        io::Error::new(io::ErrorKind::Other, e)
+    })?;
+
     let application = Application::new(users_impl);
-    let data = Data::new(AppState {
-        application: Mutex::new(application),
-    });
+    let data = Data::new(AppState { application });
 
     HttpServer::new(move || {
         App::new()
             .wrap(
                 Cors::default()
-                .allow_any_origin()
-                .allow_any_method()
-                .allow_any_header()
+                    .allow_any_origin()
+                    .allow_any_method()
+                    .allow_any_header(),
             )
             .app_data(data.clone())
             .service(get_users)

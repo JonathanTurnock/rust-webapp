@@ -1,69 +1,64 @@
-mod sqlite;
-mod mongo;
-
-use std::collections::hash_map::Entry::Vacant;
-use std::collections::HashMap;
-use log::info;
+use std::error::Error;
+use std::fmt;
 use uuid::Uuid;
 
-pub use sqlite::SqliteUserRepo;
-pub use mongo::MongoUserRepo;
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct User {
     pub id: Uuid,
     pub username: String,
     pub email: String,
 }
 
-pub trait UserRepo {
-    async fn new(db_url: &str) -> Self;
-    async fn add_user(&mut self, username: String, email: String) -> Result<User, String>;
-    async fn remove_user(&mut self, username: &String) -> Option<User>;
-    async fn get_user(&self, username: String) -> Option<User>;
-    async fn list_users(&self) -> Vec<User>;
+#[derive(Debug, Clone, Copy)]
+pub enum ConflictField { Username, Email }
+
+#[derive(Debug)]
+pub enum UserRepoError {
+    /// Database is unavailable / network / pool closed / timeouts, etc.
+    Unavailable,
+
+    /// The request was valid, but violates a constraint (unique username/email).
+    Conflict {
+        field: ConflictField,
+        value: String,
+    },
+
+    /// Everything else you didn’t classify yet.
+    /// Keep source for logs/telemetry, but don’t leak it to callers.
+    Unexpected(Box<dyn Error + Send + Sync>),
 }
 
-pub struct TestUserRepo {
-    users: HashMap<String, User>,
+impl UserRepoError {
+    pub fn unexpected<E>(e: E) -> Self
+    where E: Error + Send + Sync + 'static,
+    {
+        UserRepoError::Unexpected(Box::new(e))
+    }
 }
 
-impl UserRepo for TestUserRepo {
-    async fn new(_db_url: &str) -> Self {
-        TestUserRepo {
-            users: HashMap::new(),
+impl fmt::Display for UserRepoError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unavailable => write!(f, "repository unavailable"),
+            Self::Conflict { field, .. } => write!(f, "conflict on field {:?}", field),
+            Self::Unexpected(_) => write!(f, "unexpected repository error"),
         }
     }
+}
 
-    async fn add_user(&mut self, username: String, email: String) -> Result<User, String> {
-        info!(target: "Users", "Adding user: {}", username);
-        let user = User {
-            id: Uuid::new_v4(),
-            username: username.clone(),
-            email,
-        };
-
-        match self.users.entry(user.id.to_string()) {
-            Vacant(entry) => {
-                let user_copy = entry.insert(user).clone();
-                Ok(user_copy)
-            }
-            _ => Err(format!("User with username '{}' already exists", username)),
+impl std::error::Error for UserRepoError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Unexpected(e) => Some(&**e),
+            _ => None,
         }
     }
+}
 
-    async fn remove_user(&mut self, id: &String) -> Option<User> {
-        info!(target: "Users", "Removing user: {}", id);
-        self.users.remove(id)
-    }
-
-    async fn get_user(&self, id: String) -> Option<User> {
-        info!(target: "Users", "Getting user: {}", id);
-        self.users.get(&id).cloned()
-    }
-
-    async fn list_users(&self) -> Vec<User> {
-        info!(target: "Users", "Getting list of users");
-        self.users.values().cloned().collect()
-    }
+#[async_trait::async_trait]
+pub trait UserRepo: Send + Sync {
+    async fn add_user(&self, username: &str, email: &str) -> Result<User, UserRepoError>;
+    async fn get_user(&self, id: Uuid) -> Result<Option<User>, UserRepoError>;
+    async fn remove_user(&self, id: Uuid) -> Result<Option<User>, UserRepoError>;
+    async fn list_users(&self) -> Result<Vec<User>, UserRepoError>;
 }

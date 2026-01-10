@@ -2446,6 +2446,7 @@ version = "0.1.0"
 dependencies = [
  "actix-cors",
  "actix-web",
+ "async-trait",
  "futures-util",
  "log",
  "log4rs",
@@ -2454,6 +2455,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "testcontainers",
+ "thiserror",
  "tokio",
  "utoipa",
  "uuid",
